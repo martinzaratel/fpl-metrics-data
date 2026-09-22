@@ -1,0 +1,11 @@
+pandas>=2.2
+requests>=2.32
+python-dotenv>=1.0
+
+# Data sources
+soccerdata>=1.9.1      # FBref (best-effort; requires a headless Chrome via seleniumbase)
+understatapi>=0.7.1    # Understat (primary xG/xA/shots source, plain HTTP)
+
+# Visualization
+mplsoccer>=1.4
+matplotlib>=3.8

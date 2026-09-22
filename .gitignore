@@ -1,0 +1,30 @@
+# Environment / secrets
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+
+# soccerdata's own cache dir (created under home by default; we redirect it under data/, but ignore just in case)
+soccerdata/
+
+# Data (raw/processed outputs are regenerated each run; keep dirs via .gitkeep, ignore contents)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
