@@ -27,7 +27,10 @@ FPL_FIXTURES_URL = f"{FPL_BASE_URL}/fixtures/"
 FPL_ELEMENT_SUMMARY_URL = FPL_BASE_URL + "/element-summary/{player_id}/"
 FPL_EVENT_LIVE_URL = FPL_BASE_URL + "/event/{event_id}/live/"
 
-# --- Understat --------------------------------------------------------------
+# --- Understat ---------------------------------------------------------------
+# Called directly via requests (see scripts/fetch_data.py) rather than through
+# the understatapi package -- see the note in requirements.txt.
+UNDERSTAT_BASE_URL = "https://understat.com"
 UNDERSTAT_LEAGUE = "EPL"
 
 # --- GitHub publishing -------------------------------------------------------

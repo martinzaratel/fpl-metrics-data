@@ -4,8 +4,9 @@ Sources, in priority order:
   1. FPL public API (bootstrap-static, fixtures, event/<gw>/live).
      Plain JSON, no bot protection. This is the backbone of the combined
      DataFrame (minutes, price, points, FPL's own xG/xA per GW).
-  2. Understat, via `understatapi` (plain `requests`, CI-safe). Primary
-     source for cross-checked xG/xA/shots at player-match level.
+  2. Understat, called directly via `requests` against its JSON AJAX
+     endpoints (plain HTTP, CI-safe). Primary source for cross-checked
+     xG/xA/shots at player-match level.
   3. FBref, via `soccerdata`. BEST EFFORT ONLY: FBref now requires a full
      headless-browser session (seleniumbase) and is known to block
      datacenter/CI IPs. Every call here is wrapped so a block or scraping
@@ -133,18 +134,28 @@ def build_fpl_gw_dataframe(bootstrap: dict, live: dict, gw: int) -> pd.DataFrame
 
 # --------------------------------------------------------------------------
 # Understat (primary xG/xA cross-check; plain requests, no browser needed)
+#
+# Understat's site loads data via simple JSON AJAX endpoints -- no HTML
+# scraping or wrapper library required:
+#   GET /getLeagueData/<league>/<season>  -> {"teams":..., "players":..., "dates":[...]}
+#   GET /getMatchData/<match_id>          -> {"rosters": {"h": {...}, "a": {...}}, "shots": {...}}
+# Both need the X-Requested-With: XMLHttpRequest header to be served as AJAX.
 # --------------------------------------------------------------------------
+
+UNDERSTAT_AJAX_HEADERS = {"X-Requested-With": "XMLHttpRequest"}
+
+
+def _understat_get(path: str) -> dict:
+    url = f"{config.UNDERSTAT_BASE_URL}/{path}"
+    resp = requests.get(url, headers=UNDERSTAT_AJAX_HEADERS, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
 
 def fetch_understat_gw(season: str, start: datetime, end: datetime) -> pd.DataFrame:
     try:
-        import understatapi
-    except ImportError:
-        logger.warning("Understat: understatapi not installed, skipping.")
-        return pd.DataFrame()
-
-    client = understatapi.UnderstatClient()
-    try:
-        matches = client.league(league=config.UNDERSTAT_LEAGUE).get_match_data(season=season)
+        data = _understat_get(f"getLeagueData/{config.UNDERSTAT_LEAGUE}/{season}")
+        matches = data.get("dates", [])
     except Exception:
         logger.exception("Understat: failed to fetch league match list for season %s", season)
         return pd.DataFrame()
@@ -168,10 +179,11 @@ def fetch_understat_gw(season: str, start: datetime, end: datetime) -> pd.DataFr
     for m in target_matches:
         match_id = m["id"]
         try:
-            roster = client.match(match=match_id).get_roster_data()
+            match_data = _understat_get(f"getMatchData/{match_id}")
         except Exception:
-            logger.exception("Understat: failed to fetch roster for match id=%s", match_id)
+            logger.exception("Understat: failed to fetch data for match id=%s", match_id)
             continue
+        roster = match_data.get("rosters", {})
         for side_key in ("h", "a"):
             for player in roster.get(side_key, {}).values():
                 rows.append(

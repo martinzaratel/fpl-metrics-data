@@ -4,7 +4,13 @@ python-dotenv>=1.0
 
 # Data sources
 soccerdata>=1.9.1      # FBref (best-effort; requires a headless Chrome via seleniumbase)
-understatapi>=0.7.1    # Understat (primary xG/xA/shots source, plain HTTP)
+# Understat is called directly via requests in scripts/fetch_data.py, not via
+# the `understatapi` package: that package hard-pins requests==2.25.1 /
+# idna==2.10 / urllib3==1.26.5 in its install_requires (a frozen pip-compile
+# lockfile, true of every released version), which permanently conflicts
+# with soccerdata's seleniumbase dependency (requests~=2.34.2). Understat's
+# own endpoints (getLeagueData/<league>/<season>, getMatchData/<id>) are
+# plain JSON AJAX calls, so no wrapper library is needed.
 
 # Visualization
 mplsoccer>=1.4
