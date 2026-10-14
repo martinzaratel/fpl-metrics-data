@@ -127,6 +127,10 @@ def build_fpl_gw_dataframe(bootstrap: dict, live: dict, gw: int) -> pd.DataFrame
         "gw_minutes", "gw_starts", "gw_total_points", "gw_goals_scored", "gw_assists",
         "gw_expected_goals", "gw_expected_assists", "gw_expected_goal_involvements",
         "gw_expected_goals_conceded", "gw_bonus", "gw_bps", "gw_ict_index",
+        # Raw components of FPL's own Defensive Contribution bonus point
+        # (see calculate_metrics.compute_defcon for the exact formula).
+        "gw_tackles", "gw_clearances_blocks_interceptions", "gw_recoveries",
+        "gw_defensive_contribution",
     ]
     keep = [c for c in keep if c in df.columns]
     return df[keep].reset_index(drop=True)
@@ -218,7 +222,14 @@ def fetch_understat_gw(season: str, start: datetime, end: datetime) -> pd.DataFr
 # FBref (best-effort only -- see module docstring)
 # --------------------------------------------------------------------------
 
-def fetch_fbref_gw(start: datetime, end: datetime) -> pd.DataFrame:
+def fetch_fbref_match_stats(start: datetime, end: datetime) -> pd.DataFrame:
+    """Raw per-player, per-match FBref "summary" stats for matches in a date window.
+
+    Unaggregated (keeps game_id/team/player) so callers can roll it up
+    however they need -- fetch_fbref_gw() aggregates to one row per player
+    for the FPL join; calculate_metrics.compute_ppda() aggregates to one
+    row per team per match instead.
+    """
     try:
         import soccerdata as sd
     except ImportError:
@@ -248,6 +259,14 @@ def fetch_fbref_gw(start: datetime, end: datetime) -> pd.DataFrame:
         return pd.DataFrame()
 
     stats["name_key"] = stats["player"].apply(normalize_name)
+    return stats
+
+
+def fetch_fbref_gw(start: datetime, end: datetime) -> pd.DataFrame:
+    stats = fetch_fbref_match_stats(start, end)
+    if stats.empty:
+        return stats
+
     signal_cols = [
         c for c in stats.columns
         if any(k in c.lower() for k in ("tkl", "int", "blocks", "clr", "prgp", "prgc", "sca", "gca", "xg", "xa"))
