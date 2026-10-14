@@ -331,6 +331,23 @@ def load_recent_gw_files(n: int = 5) -> pd.DataFrame:
     return pd.concat([pd.read_csv(f) for _, f in recent], ignore_index=True)
 
 
+def attach_xgi_source(history: pd.DataFrame) -> pd.DataFrame:
+    """Add an `xgi_source` column: Understat's xG+xA, falling back to FPL's own
+    gw_expected_goal_involvements for player-gameweeks Understat didn't match."""
+    history = history.copy()
+    understat_xgi = history.get("understat_xg", pd.Series(dtype=float)).fillna(0) + history.get(
+        "understat_xa", pd.Series(dtype=float)
+    ).fillna(0)
+    history["xgi_source"] = understat_xgi
+
+    if "gw_expected_goal_involvements" in history.columns:
+        missing_understat = history.get("understat_xg", pd.Series(dtype=float)).isna() & history.get(
+            "understat_xa", pd.Series(dtype=float)
+        ).isna()
+        history.loc[missing_understat, "xgi_source"] = history.loc[missing_understat, "gw_expected_goal_involvements"].fillna(0)
+    return history
+
+
 def compute_player_xgi_form(n: int = 5) -> pd.DataFrame:
     """Player xGI (xG + xA) form, summed/averaged over the last `n` available gameweeks.
 
@@ -344,17 +361,7 @@ def compute_player_xgi_form(n: int = 5) -> pd.DataFrame:
         logger.warning("xGI form: no accumulated gameweek files in data/processed/. Run fetch_data.py first.")
         return pd.DataFrame()
 
-    understat_xgi = history.get("understat_xg", pd.Series(dtype=float)).fillna(0) + history.get(
-        "understat_xa", pd.Series(dtype=float)
-    ).fillna(0)
-    history["xgi_source"] = understat_xgi
-
-    if "gw_expected_goal_involvements" in history.columns:
-        missing_understat = history.get("understat_xg", pd.Series(dtype=float)).isna() & history.get(
-            "understat_xa", pd.Series(dtype=float)
-        ).isna()
-        history.loc[missing_understat, "xgi_source"] = history.loc[missing_understat, "gw_expected_goal_involvements"].fillna(0)
-
+    history = attach_xgi_source(history)
     agg = history.groupby(["id", "full_name", "team_name", "position"], as_index=False).agg(
         gameweeks_counted=("gameweek", "nunique"),
         minutes_total=("gw_minutes", "sum"),
